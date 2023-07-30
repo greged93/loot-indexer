@@ -13,6 +13,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/lib/pq v1.10.9
 	github.com/lithammer/shortuuid/v4 v4.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/orcaman/concurrent-map v1.0.0 // indirect

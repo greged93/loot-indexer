@@ -8,20 +8,22 @@ import (
 )
 
 type IndexerConfig struct {
+	rpcUrl string
 }
 
 type Indexer struct {
+	IndexerConfig
 	logger *log.Logger
 }
 
-func NewIndexerProducer() actor.Producer {
+func NewIndexerProducer(config IndexerConfig) actor.Producer {
 	return func() actor.Actor {
-		return NewIndexer()
+		return NewIndexer(config)
 	}
 }
 
-func NewIndexer() *Indexer {
-	return &Indexer{}
+func NewIndexer(config IndexerConfig) *Indexer {
+	return &Indexer{IndexerConfig: config}
 }
 
 func (state *Indexer) Receive(ctx actor.Context) {
