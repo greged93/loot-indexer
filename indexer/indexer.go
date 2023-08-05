@@ -1,6 +1,8 @@
 package indexer
 
 import (
+	"database/sql"
+	"fmt"
 	"reflect"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -8,11 +10,21 @@ import (
 )
 
 type IndexerConfig struct {
-	rpcUrl string
+	rpcUrl    string
+	sqlConfig SqlConfig
+}
+
+type SqlConfig struct {
+	Host     string
+	Port     uint
+	Db       string
+	User     string
+	Password string
 }
 
 type Indexer struct {
 	IndexerConfig
+	db     *sql.DB
 	logger *log.Logger
 }
 
@@ -56,6 +68,17 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		log.String("ID", ctx.Self().Id),
 		log.String("Type", reflect.TypeOf(*state).String()),
 	)
+
+	sqlConfig := state.sqlConfig
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable",
+		sqlConfig.Host, sqlConfig.Port, sqlConfig.User, sqlConfig.Password, sqlConfig.Db)
+
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		return fmt.Errorf("error opening sql database: %v", err)
+	}
+	state.db = db
 	return nil
 }
 
