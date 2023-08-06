@@ -23,9 +23,9 @@ type SqlConfig struct {
 }
 
 type Indexer struct {
-	IndexerConfig
-	db     *sql.DB
-	logger *log.Logger
+	indexerConfig IndexerConfig
+	db            *sql.DB
+	logger        *log.Logger
 }
 
 func NewIndexerProducer(config IndexerConfig) actor.Producer {
@@ -35,7 +35,7 @@ func NewIndexerProducer(config IndexerConfig) actor.Producer {
 }
 
 func NewIndexer(config IndexerConfig) *Indexer {
-	return &Indexer{IndexerConfig: config}
+	return &Indexer{indexerConfig: config}
 }
 
 func (state *Indexer) Receive(ctx actor.Context) {
@@ -69,7 +69,7 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		log.String("Type", reflect.TypeOf(*state).String()),
 	)
 
-	sqlConfig := state.sqlConfig
+	sqlConfig := state.indexerConfig.sqlConfig
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		sqlConfig.Host, sqlConfig.Port, sqlConfig.User, sqlConfig.Password, sqlConfig.Db)
