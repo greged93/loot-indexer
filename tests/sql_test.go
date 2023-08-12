@@ -9,14 +9,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const (
-	host     = "localhost"
-	port     = 5432
-	db       = "loot"
-	user     = "loot"
-	password = "loot-survivor"
-)
-
 func BeforeEach(t *testing.T) *sql.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",

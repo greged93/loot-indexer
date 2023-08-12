@@ -2,40 +2,18 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	starkclient "loot-indexer/stark-client"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/NethermindEth/juno/core/felt"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
 
-var cl *starkclient.Client
-
-const (
-	URL_GOERLI = "https://starknet-goerli.infura.io/v3/"
-)
-
-func TestMain(m *testing.M) {
-	err := godotenv.Load("../.env")
-	if err != nil {
-		fmt.Printf("failed to load env: %v", err)
-		os.Exit(1)
-	}
-	infuraKey := os.Getenv("INFURA_KEY")
-	url := URL_GOERLI + infuraKey
-	cl, err = starkclient.Dial(url)
-	if err != nil {
-		fmt.Printf("failed to load env: %v", err)
-		os.Exit(1)
-	}
-	os.Exit(m.Run())
-}
-
 func TestGetEvents(t *testing.T) {
+	if cl == nil {
+		t.Fatalf("nil client")
+	}
 	filter := starkclient.EventsArg{
 		EventFilter: starkclient.EventFilter{
 			FromBlock: &starkclient.BlockID{

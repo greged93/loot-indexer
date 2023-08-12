@@ -3,6 +3,7 @@ package indexer
 import (
 	"database/sql"
 	"fmt"
+	starkclient "loot-indexer/stark-client"
 	"reflect"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -12,6 +13,10 @@ import (
 type IndexerConfig struct {
 	rpcUrl    string
 	sqlConfig SqlConfig
+}
+
+func NewIndexerConfig(rpcUrl string, sqlConfig SqlConfig) *IndexerConfig {
+	return &IndexerConfig{rpcUrl: rpcUrl, sqlConfig: sqlConfig}
 }
 
 type SqlConfig struct {
@@ -25,6 +30,7 @@ type SqlConfig struct {
 type Indexer struct {
 	indexerConfig IndexerConfig
 	db            *sql.DB
+	client        *starkclient.Client
 	logger        *log.Logger
 }
 
@@ -79,6 +85,13 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		return fmt.Errorf("error opening sql database: %v", err)
 	}
 	state.db = db
+
+	client, err := starkclient.Dial(state.indexerConfig.rpcUrl)
+	if err != nil {
+		return fmt.Errorf("error dialing starknet client: %v", err)
+	}
+	state.client = client
+
 	return nil
 }
 
