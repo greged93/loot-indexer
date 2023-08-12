@@ -22,7 +22,7 @@ func TestIndexer(t *testing.T) {
 	}
 
 	// sleep a little to be sure actor is ok
-	time.Sleep(20 * time.Second)
+	time.Sleep(5 * time.Second)
 	if err := ctx.PoisonFuture(indexerPid).Wait(); !assert.Nil(t, err, "failed to stop indexer: %v", err) {
 		t.Fatal()
 	}

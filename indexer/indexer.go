@@ -1,35 +1,30 @@
 package indexer
 
 import (
-	"database/sql"
 	"fmt"
+	"loot-indexer/loot"
 	starkclient "loot-indexer/stark-client"
 	"reflect"
 
+	"github.com/NethermindEth/juno/core/felt"
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
+	"gorm.io/gorm"
 )
 
 type IndexerConfig struct {
-	rpcUrl    string
-	sqlConfig SqlConfig
+	rpcUrl          string
+	contractAddress *felt.Felt
+	lastBlock       uint64
+	db              *gorm.DB
 }
 
-func NewIndexerConfig(rpcUrl string, sqlConfig SqlConfig) *IndexerConfig {
-	return &IndexerConfig{rpcUrl: rpcUrl, sqlConfig: sqlConfig}
-}
-
-type SqlConfig struct {
-	Host     string
-	Port     uint
-	Db       string
-	User     string
-	Password string
+func NewIndexerConfig(rpcUrl string, contractAddress *felt.Felt, db *gorm.DB) *IndexerConfig {
+	return &IndexerConfig{rpcUrl: rpcUrl, contractAddress: contractAddress, db: db}
 }
 
 type Indexer struct {
 	indexerConfig IndexerConfig
-	db            *sql.DB
 	client        *starkclient.Client
 	logger        *log.Logger
 }
@@ -75,20 +70,22 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		log.String("Type", reflect.TypeOf(*state).String()),
 	)
 
-	sqlConfig := state.indexerConfig.sqlConfig
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		sqlConfig.Host, sqlConfig.Port, sqlConfig.User, sqlConfig.Password, sqlConfig.Db)
-
-	db, err := sql.Open("postgres", psqlInfo)
+	err := state.indexerConfig.db.AutoMigrate(&loot.LootEvent{})
 	if err != nil {
-		return fmt.Errorf("error opening sql database: %v", err)
+		return fmt.Errorf("error creating loot table: %v", err)
 	}
-	state.db = db
+
+	var event loot.LootEvent
+	if err = state.indexerConfig.db.Order("block_number desc").First(&event).Error; err != gorm.ErrRecordNotFound {
+		return fmt.Errorf("error retrieving last event from db: %v", err)
+	}
+	if err == nil {
+		state.indexerConfig.lastBlock = event.BlockNumber
+	}
 
 	client, err := starkclient.Dial(state.indexerConfig.rpcUrl)
 	if err != nil {
-		return fmt.Errorf("error dialing starknet client: %v", err)
+		return fmt.Errorf("error dialing starknet client at url %s: %v", state.indexerConfig.rpcUrl, err)
 	}
 	state.client = client
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/NethermindEth/juno/core/felt"
 	"github.com/joho/godotenv"
 )
 
@@ -40,7 +41,19 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	indexerConfig = indexer.NewIndexerConfig(url, indexer.SqlConfig{Host: host, Port: port, Db: db, User: user, Password: password})
+	contractAddress, err := felt.Zero.SetString("0x1234")
+	if err != nil {
+		fmt.Printf("failed to convert 0x1234 to felt: %v", err)
+		os.Exit(1)
+	}
+
+	db, err := InitDB()
+	if err != nil {
+		fmt.Printf("failed to initialize db: %v", err)
+		os.Exit(1)
+	}
+
+	indexerConfig = indexer.NewIndexerConfig(url, contractAddress, db)
 
 	os.Exit(m.Run())
 }

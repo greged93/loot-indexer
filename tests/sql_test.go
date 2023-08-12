@@ -1,47 +1,51 @@
 package tests
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"testing"
 
-	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func BeforeEach(t *testing.T) *sql.DB {
+func InitDB() (*gorm.DB, error) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, db)
 
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := gorm.Open(postgres.Open(psqlInfo), &gorm.Config{})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return db
+	return db, nil
 }
 
 func TestPostgresConnexion(t *testing.T) {
-	db := BeforeEach(t)
-	defer db.Close()
-
-	err := db.Ping()
-	if err != nil {
-		log.Fatal(err)
+	_, err := InitDB()
+	if !assert.Nil(t, err, "failed to connect to db: %v", err) {
+		t.Fatal()
 	}
 }
 
 func TestPostgresAddTable(t *testing.T) {
-	db := BeforeEach(t)
-	defer db.Close()
+	db, err := InitDB()
+	if !assert.Nil(t, err, "failed to connect to db: %v", err) {
+		t.Fatal()
+	}
+	type SimpleTable struct {
+		ID   uint `gorm:"primary_key"`
+		Name string
+	}
 
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS loot (id SERIAL PRIMARY KEY, name VARCHAR(50))")
+	err = db.AutoMigrate(&SimpleTable{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = db.Exec("INSERT INTO loot (name) VALUES ($1)", "hero")
+	err = db.Create(&SimpleTable{Name: "test"}).Error
 	if err != nil {
 		log.Fatal(err)
 	}
