@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -17,10 +16,6 @@ const (
 	user     = "loot"
 	password = "loot-survivor"
 )
-
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
-}
 
 func BeforeEach(t *testing.T) *sql.DB {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
