@@ -76,7 +76,7 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 	}
 
 	var event loot.LootEvent
-	if err = state.indexerConfig.db.Order("block_number desc").First(&event).Error; err != gorm.ErrRecordNotFound {
+	if err = state.indexerConfig.db.Order("block_number desc").First(&event).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return fmt.Errorf("error retrieving last event from db: %v", err)
 	}
 	if err == nil {

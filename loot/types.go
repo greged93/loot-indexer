@@ -1,30 +1,37 @@
 package loot
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"github.com/NethermindEth/juno/core/felt"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func FeltToBigInt(f *felt.Felt) (*big.Int, bool) {
 	return new(big.Int).SetString(f.String(), 0)
 }
 
-func FeltToNumeric(f *felt.Felt) (pgtype.Numeric, error) {
-	if f == nil {
-		return pgtype.Numeric{}, fmt.Errorf("expected felt, got nil")
-	}
-	b, ok := FeltToBigInt(f)
+type SqlBigInt big.Int
+
+func (b *SqlBigInt) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
 	if !ok {
-		return pgtype.Numeric{}, fmt.Errorf("failed to convert felt to big.Int")
+		return fmt.Errorf("expected []byte, got %T", value)
 	}
-	return pgtype.Numeric{Int: b}, nil
+	result := new(big.Int).SetBytes(bytes)
+	*b = SqlBigInt(*result)
+	return nil
+}
+
+func (sqlB SqlBigInt) Value() (driver.Value, error) {
+	b := big.Int(sqlB)
+	return json.Marshal(b.Bytes())
 }
 
 type Adventurer struct {
-	AdventurerID        *felt.Felt    `gorm:"primaryKey"`
+	AdventurerID        SqlBigInt
 	LastAction          uint16        // 9 bits
 	Health              uint16        // 9 bits
 	Xp                  uint16        // 13 bits
