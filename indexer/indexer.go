@@ -70,12 +70,12 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		log.String("Type", reflect.TypeOf(*state).String()),
 	)
 
-	err := state.indexerConfig.db.AutoMigrate(&loot.LootEvent{})
+	err := state.indexerConfig.db.AutoMigrate(&loot.RawEvent{})
 	if err != nil {
 		return fmt.Errorf("error creating loot table: %v", err)
 	}
 
-	var event loot.LootEvent
+	var event loot.RawEvent
 	if err = state.indexerConfig.db.Order("block_number desc").First(&event).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return fmt.Errorf("error retrieving last event from db: %v", err)
 	}

@@ -32,6 +32,7 @@ func (sqlB SqlBigInt) Value() (driver.Value, error) {
 
 type Adventurer struct {
 	AdventurerID        SqlBigInt
+	Level               uint16
 	LastAction          uint16        // 9 bits
 	Health              uint16        // 9 bits
 	Xp                  uint16        // 13 bits
@@ -51,10 +52,10 @@ type Adventurer struct {
 }
 
 type AdventurerMetadata struct {
-	Name      *felt.Felt
+	Name      SqlBigInt
 	HomeRealm uint16
 	Class     uint8
-	Entropy   *felt.Felt
+	Entropy   SqlBigInt
 }
 
 type ItemPrimitive struct {
@@ -73,8 +74,8 @@ type Stats struct {
 }
 
 type AdventurerState struct {
-	Owner        *felt.Felt
-	AdventurerId *felt.Felt
+	Owner        SqlBigInt
+	AdventurerId SqlBigInt
 	Adventurer
 }
 
@@ -83,19 +84,255 @@ type AdventurerStateWithBag struct {
 	Bag
 }
 
+func (a *AdventurerStateWithBag) ApplyEvent(event []byte) error {
+	var rawEvent RawEvent
+	err := json.Unmarshal(event, &rawEvent)
+	if err != nil {
+		return err
+	}
+
+	switch rawEvent.Type {
+	case StarGameType:
+		var startGame StartGame
+		err := json.Unmarshal(rawEvent.Event, &startGame)
+		if err != nil {
+			return err
+		}
+		a.AdventurerState = startGame.AdventurerState
+	case DiscoveredHealthType:
+		var discoveredHealth DiscoveredHealth
+		err := json.Unmarshal(rawEvent.Event, &discoveredHealth)
+		if err != nil {
+			return err
+		}
+		a.Health += discoveredHealth.HealthAmount
+	case DiscoveredGoldType:
+		var discoveredGold DiscoveredGold
+		err := json.Unmarshal(rawEvent.Event, &discoveredGold)
+		if err != nil {
+			return err
+		}
+		a.Gold += discoveredGold.Goldamount
+	case DiscoveredXPType:
+		var discoveredXP DiscoveredXP
+		err := json.Unmarshal(rawEvent.Event, &discoveredXP)
+		if err != nil {
+			return err
+		}
+		a.Xp += discoveredXP.XpAmount
+	case DodgedObstacleType:
+		var dodgedObstacle DodgedObstacle
+		err := json.Unmarshal(rawEvent.Event, &dodgedObstacle)
+		if err != nil {
+			return err
+		}
+		a.Health -= dodgedObstacle.DamageTaken
+		a.Xp += dodgedObstacle.XpEarnedAdventurer
+		a.AddXpWeapons(dodgedObstacle.XpEarnedItems)
+	case HitByObstacleType:
+		var hitByObstacle HitByObstacle
+		err := json.Unmarshal(rawEvent.Event, &hitByObstacle)
+		if err != nil {
+			return err
+		}
+		a.Health -= hitByObstacle.DamageTaken
+		a.Xp += hitByObstacle.XpEarnedAdventurer
+		a.AddXpWeapons(hitByObstacle.XpEarnedItems)
+
+	case DiscoveredBeastType:
+		var discoveredBeast DiscoveredBeast
+		err := json.Unmarshal(rawEvent.Event, &discoveredBeast)
+		if err != nil {
+			return err
+		}
+		a.BeastHealth = discoveredBeast.BeastHealth
+	case AmbushedByBeastType:
+		var ambushedByBeast AmbushedByBeast
+		err := json.Unmarshal(rawEvent.Event, &ambushedByBeast)
+		if err != nil {
+			return err
+		}
+		a.BeastHealth = ambushedByBeast.BeastHealth
+		a.Health -= ambushedByBeast.Damage
+	case AttackedBeastType:
+		var attackedBeast AttackedBeast
+		err := json.Unmarshal(rawEvent.Event, &attackedBeast)
+		if err != nil {
+			return err
+		}
+		a.BeastHealth -= attackedBeast.Damage
+	case AttackedByBeastType:
+		var attackedByBeast AttackedByBeast
+		err := json.Unmarshal(rawEvent.Event, &attackedByBeast)
+		if err != nil {
+			return err
+		}
+		a.Health -= attackedByBeast.Damage
+	case SlayedBeastType:
+		var slayedBeast SlayedBeast
+		err := json.Unmarshal(rawEvent.Event, &slayedBeast)
+		if err != nil {
+			return err
+		}
+		a.Xp += slayedBeast.XpEarnedAdventurer
+		a.Gold += slayedBeast.GoldEarned
+		a.BeastHealth = 0
+		a.AddXpWeapons(slayedBeast.XpEarnedItems)
+
+	case FleeFailedType:
+		break
+	case FleeSucceededType:
+		var fleeSucceeded FleeSucceeded
+		err := json.Unmarshal(rawEvent.Event, &fleeSucceeded)
+		if err != nil {
+			return err
+		}
+		a.BeastHealth = 0
+	case PurchasedPotionsType:
+		var purchasedPotions PurchasedPotions
+		err := json.Unmarshal(rawEvent.Event, &purchasedPotions)
+		if err != nil {
+			return err
+		}
+		a.Gold -= purchasedPotions.Cost
+		a.Health += uint16(purchasedPotions.Quantity) * purchasedPotions.Health
+	case PurchasedItemsType:
+		var purchasedItems PurchasedItems
+		err := json.Unmarshal(rawEvent.Event, &purchasedItems)
+		if err != nil {
+			return err
+		}
+		for _, loot := range purchasedItems.Purchases {
+			a.Gold -= loot.Price
+			a.Bag.addItem(loot.Loot)
+		}
+	case EquippedItemsType:
+		var equippedItems EquippedItems
+		err := json.Unmarshal(rawEvent.Event, &equippedItems)
+		if err != nil {
+			return err
+		}
+		// TODO: equip items
+	case DroppedItemsType:
+		var droppedItems DroppedItems
+		err := json.Unmarshal(rawEvent.Event, &droppedItems)
+		if err != nil {
+			return err
+		}
+		// TODO drop items
+	case ItemLeveledUpType:
+		var itemLeveledUp ItemLeveledUp
+		err := json.Unmarshal(rawEvent.Event, &itemLeveledUp)
+		if err != nil {
+			return err
+		}
+		// TODO level up items
+	case ItemSpecialUnlockedType:
+		var itemSpecialUnlocked ItemSpecialUnlocked
+		err := json.Unmarshal(rawEvent.Event, &itemSpecialUnlocked)
+		if err != nil {
+			return err
+		}
+		// TODO unlock item special
+	case NewHighScoreType:
+		var newHighScore NewHighScore
+		err := json.Unmarshal(rawEvent.Event, &newHighScore)
+		if err != nil {
+			return err
+		}
+		// TODO update high score
+	case AdventurerDiedType:
+		var adventurerDied AdventurerDied
+		err := json.Unmarshal(rawEvent.Event, &adventurerDied)
+		if err != nil {
+			return err
+		}
+		a.Health = 0
+	case ShopAvailableType:
+		var shopAvailable ShopAvailable
+		err := json.Unmarshal(rawEvent.Event, &shopAvailable)
+		if err != nil {
+			return err
+		}
+		// TODO update shop
+	case AdventurerLeveledUpType:
+		var adventurerLeveledUp AdventurerLeveledUp
+		err := json.Unmarshal(rawEvent.Event, &adventurerLeveledUp)
+		if err != nil {
+			return err
+		}
+		a.Level += 1
+	case NewItemsAvailableType:
+		var newItemsAvailable NewItemsAvailable
+		err := json.Unmarshal(rawEvent.Event, &newItemsAvailable)
+		if err != nil {
+			return err
+		}
+		// TODO update shop
+	case IdleDamagePenaltyType:
+		var idleDamagePenalty IdleDamagePenalty
+		err := json.Unmarshal(rawEvent.Event, &idleDamagePenalty)
+		if err != nil {
+			return err
+		}
+		a.Health -= idleDamagePenalty.DamageTaken
+	case UpgradeAvailableType:
+		var upgradeAvailable UpgradeAvailable
+		err := json.Unmarshal(rawEvent.Event, &upgradeAvailable)
+		if err != nil {
+			return err
+		}
+		// TODO upgrade
+	case AdventurerUpgradedType:
+		var adventurerUpgraded AdventurerUpgraded
+		err := json.Unmarshal(rawEvent.Event, &adventurerUpgraded)
+		if err != nil {
+			return err
+		}
+		a.Upgrade(adventurerUpgraded)
+	default:
+		return fmt.Errorf("unknown event type %d", rawEvent.Type)
+	}
+	return nil
+}
+
+func (a *AdventurerState) AddXpWeapons(xp uint16) {
+	a.Weapon.Xp += xp
+	a.Chest.Xp += xp
+	a.Head.Xp += xp
+	a.Waist.Xp += xp
+	a.Foot.Xp += xp
+	a.Hand.Xp += xp
+	a.Neck.Xp += xp
+	a.Ring.Xp += xp
+}
+
+func (a *AdventurerState) Upgrade(upgrade AdventurerUpgraded) {
+	a.Stats.Strength += upgrade.StrengthIncrease
+	a.Stats.Dexterity += upgrade.DexterityIncrease
+	a.Stats.Vitality += upgrade.VitalityIncrease
+	a.Stats.Intelligence += upgrade.IntelligenceIncrease
+	a.Stats.Wisdom += upgrade.WisdomIncrease
+	a.Stats.Charisma += upgrade.CharismaIncrease
+}
+
 type Bag struct {
-	Item1   ItemPrimitive
-	Item2   ItemPrimitive
-	Item3   ItemPrimitive
-	Item4   ItemPrimitive
-	Item5   ItemPrimitive
-	Item6   ItemPrimitive
-	Item7   ItemPrimitive
-	Item8   ItemPrimitive
-	Item9   ItemPrimitive
-	Item10  ItemPrimitive
-	Item11  ItemPrimitive
+	Items   [11]*ItemPrimitive
 	Mutated bool
+}
+
+func (b *Bag) addItem(loot Loot) {
+	item := ItemPrimitive{
+		Id:       loot.Id,
+		Xp:       0,
+		Metadata: 0, // TODO
+	}
+	for i := 0; i < 11; i++ {
+		if b.Items[i] == nil {
+			b.Items[i] = &item
+			return
+		}
+	}
 }
 
 type CombatSpec struct {
@@ -103,10 +340,6 @@ type CombatSpec struct {
 	ItemType Type
 	Level    uint16
 	Specials uint32 // packed bits of SpecialPowers
-}
-
-func (s *CombatSpec) Pack() uint64 {
-	return uint64(s.Specials)<<32 | uint64(s.Level)<<16 | uint64(s.ItemType)<<8 | uint64(s.Tier)
 }
 
 type SpecialPowers struct {
@@ -118,10 +351,6 @@ type SpecialPowers struct {
 type LootWithPrice struct {
 	Loot
 	Price uint16
-}
-
-func (l *LootWithPrice) Pack() uint64 {
-	return uint64(l.Price)<<32 | uint64(l.Loot.Pack())
 }
 
 type Loot struct {
@@ -139,8 +368,4 @@ type ItemSpecials struct {
 	Special1 uint8 // 4 bit
 	Special2 uint8 // 7 bits
 	Special3 uint8 // 5 bits
-}
-
-func (s *ItemSpecials) Pack() uint32 {
-	return uint32(s.Special3)<<16 | uint32(s.Special2)<<8 | uint32(s.Special1)
 }

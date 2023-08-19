@@ -1,67 +1,45 @@
 package loot
 
 import (
-	"fmt"
-
 	"github.com/NethermindEth/juno/core/felt"
 )
 
-type LootEvent struct {
-	// Owner
-	Owner        SqlBigInt `gorm:"primaryKey"`
-	AdventurerId SqlBigInt `gorm:"primaryKey"`
-	// Block
-	BlockNumber uint64
-	// Event
-	Type Event
-	Seed SqlBigInt
-	Id   uint8
-	// Earned
-	HealthAmount       uint16
-	GoldAmount         uint16
-	GoldEarned         uint16
-	XpAmount           uint16
-	Level              uint16
-	XpEarnedAdventurer uint16
-	XpEarnedItems      uint16
-	// Combat
-	BeastSpecs     uint64
-	Location       uint8
-	Damage         uint16
-	CriticalHit    bool
-	IdleBlocks     uint16
-	DamageTaken    uint16
-	DamageDealt    uint16
-	DamageLocation uint8
-	// Purchased
-	Quantity  uint8
-	Cost      uint16
-	Health    uint16
-	Purchases []uint64 `gorm:"type:bigint[]"`
-	// Equipped
-	EquippedItems   []uint8 `gorm:"type:bigint[]"`
-	UnequippedItems []uint8 `gorm:"type:bigint[]"`
-	ItemIds         []uint8 `gorm:"type:bigint[]"`
-	// Level up
-	ItemId        uint8
-	PreviousLevel uint8
-	NewLevel      uint8
-	Specials      uint32
-	Rank          uint8 // 1-3
-	// Killed
-	KilledByBeast    bool
-	KilledByoBstacle bool
-	KillerId         uint8
-	// Shop
-	Inventory []uint32 `gorm:"type:bigint[]"`
-	Items     []uint64 `gorm:"type:bigint[]"`
-	// Upgrade
-	StrengthIncrease     uint8
-	DexterityIncrease    uint8
-	VitalityIncrease     uint8
-	IntelligenceIncrease uint8
-	WisdomIncrease       uint8
-	CharismaIncrease     uint8
+type EventType uint8
+
+const (
+	StarGameType EventType = iota
+	DiscoveredHealthType
+	DiscoveredGoldType
+	DiscoveredXPType
+	DodgedObstacleType
+	HitByObstacleType
+	DiscoveredBeastType
+	AmbushedByBeastType
+	AttackedBeastType
+	AttackedByBeastType
+	SlayedBeastType
+	FleeFailedType
+	FleeSucceededType
+	PurchasedPotionsType
+	PurchasedItemsType
+	EquippedItemsType
+	DroppedItemsType
+	ItemLeveledUpType
+	ItemSpecialUnlockedType
+	NewHighScoreType
+	AdventurerDiedType
+	ShopAvailableType
+	AdventurerLeveledUpType
+	NewItemsAvailableType
+	IdleDamagePenaltyType
+	UpgradeAvailableType
+	AdventurerUpgradedType
+)
+
+type RawEvent struct {
+	Type        EventType `json:"type"`
+	Event       []byte    `json:"event"`
+	BlockNumber uint64    `json:"block"`
 }
 
 type StartGame struct {
@@ -69,35 +47,9 @@ type StartGame struct {
 	AdventurerMetadata
 }
 
-func (e *LootEvent) FromDiscoveredHealthEvent(event *DiscoveredHealth) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DiscoveredHealthEvent
-	e.HealthAmount = event.HealthAmount
-	return nil
-}
-
 type DiscoveredHealth struct {
 	AdventurerState
 	HealthAmount uint16
-}
-
-func (e *LootEvent) FromDiscoveredGoldEvent(event *DiscoveredGold) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DiscoveredGoldEvent
-	e.GoldAmount = event.Goldamount
-	return nil
 }
 
 type DiscoveredGold struct {
@@ -105,40 +57,9 @@ type DiscoveredGold struct {
 	Goldamount uint16
 }
 
-func (e *LootEvent) FromDiscoveredXPEvent(event *DiscoveredXP) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DiscoveredXPEvent
-	e.XpAmount = event.XpAmount
-	return nil
-}
-
 type DiscoveredXP struct {
 	AdventurerState
 	XpAmount uint16
-}
-
-func (e *LootEvent) FromDodgedObstacleEvent(event *DodgedObstacle) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DodgedObstacleEvent
-	e.Id = event.Id
-	e.Level = event.Level
-	e.DamageTaken = event.DamageTaken
-	e.DamageLocation = event.DamageLocation
-	e.XpEarnedAdventurer = event.XpEarnedAdventurer
-	e.XpEarnedItems = event.XpEarnedItems
-	return nil
 }
 
 type DodgedObstacle struct {
@@ -151,24 +72,6 @@ type DodgedObstacle struct {
 	XpEarnedItems      uint16
 }
 
-func (e *LootEvent) FromHitByObstacleEvent(event *HitByObstacle) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = HitByObstacleEvent
-	e.Id = event.Id
-	e.Level = event.Level
-	e.DamageTaken = event.DamageTaken
-	e.DamageLocation = event.DamageLocation
-	e.XpEarnedAdventurer = event.XpEarnedAdventurer
-	e.XpEarnedItems = event.XpEarnedItems
-	return nil
-}
-
 type HitByObstacle struct {
 	AdventurerState    AdventurerState
 	Id                 uint8
@@ -179,42 +82,11 @@ type HitByObstacle struct {
 	XpEarnedItems      uint16
 }
 
-func (e *LootEvent) FromDiscoveredBeastEvent(event *DiscoveredBeast) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DiscoveredBeastEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	return nil
-}
-
 type DiscoveredBeast struct {
 	AdventurerState
 	Seed       *felt.Felt
 	Id         uint8
 	BeastSpecs CombatSpec
-}
-
-func (e *LootEvent) FromAmbushedByBeastEvent(event *AmbushedByBeast) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AmbushedByBeastEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	e.Damage = event.Damage
-	e.CriticalHit = event.CriticalHit
-	e.Location = event.Location
-	return nil
 }
 
 type AmbushedByBeast struct {
@@ -227,23 +99,6 @@ type AmbushedByBeast struct {
 	Location    uint8
 }
 
-func (e *LootEvent) FromAttackedBeastEvent(event *AttackedBeast) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AttackedBeastEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	e.Damage = event.Damage
-	e.CriticalHit = event.CriticalHit
-	e.Location = event.Location
-	return nil
-}
-
 type AttackedBeast struct {
 	AdventurerState
 	Seed        *felt.Felt
@@ -254,23 +109,6 @@ type AttackedBeast struct {
 	Location    uint8
 }
 
-func (e *LootEvent) FromAttackedByBeastEvent(event *AttackedByBeast) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AttackedByBeastEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	e.Damage = event.Damage
-	e.CriticalHit = event.CriticalHit
-	e.Location = event.Location
-	return nil
-}
-
 type AttackedByBeast struct {
 	AdventurerState
 	Seed        *felt.Felt
@@ -279,25 +117,6 @@ type AttackedByBeast struct {
 	Damage      uint16
 	CriticalHit bool
 	Location    uint8
-}
-
-func (e *LootEvent) FromSlayedBeastEvent(event *SlayedBeast) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = SlayedBeastEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	e.DamageDealt = event.DamageDealt
-	e.CriticalHit = event.CriticalHit
-	e.XpEarnedAdventurer = event.XpEarnedAdventurer
-	e.XpEarnedItems = event.XpEarnedItems
-	e.GoldEarned = event.GoldEarned
-	return nil
 }
 
 type SlayedBeast struct {
@@ -312,39 +131,11 @@ type SlayedBeast struct {
 	GoldEarned         uint16
 }
 
-func (e *LootEvent) FromFleeFailedEvent(event *FleeFailed) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = FleeFailedEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	return nil
-}
-
 type FleeFailed struct {
 	AdventurerState
 	Seed       *felt.Felt
 	Id         uint8
 	BeastSpecs CombatSpec
-}
-
-func (e *LootEvent) FromFleeSucceededEvent(event *FleeSucceeded) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = FleeSucceededEvent
-	e.Id = event.Id
-	e.BeastSpecs = event.BeastSpecs.Pack()
-	return nil
 }
 
 type FleeSucceeded struct {
@@ -354,21 +145,6 @@ type FleeSucceeded struct {
 	BeastSpecs CombatSpec
 }
 
-func (e *LootEvent) FromPurchasedPotionsEvent(event *PurchasedPotions) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = PurchasedPotionsEvent
-	e.Quantity = event.Quantity
-	e.Cost = event.Cost
-	e.Health = event.Health
-	return nil
-}
-
 type PurchasedPotions struct {
 	AdventurerState
 	Quantity uint8
@@ -376,40 +152,9 @@ type PurchasedPotions struct {
 	Health   uint16
 }
 
-func (e *LootEvent) FromPurchasedItemsEvent(event *PurchasedItems) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = PurchasedItemsEvent
-	var purchases []uint64
-	for _, p := range event.Purchases {
-		purchases = append(purchases, p.Pack())
-	}
-	e.Purchases = purchases
-	return nil
-}
-
 type PurchasedItems struct {
 	AdventurerStateWithBag
 	Purchases []*LootWithPrice
-}
-
-func (e *LootEvent) FromEquippedItemsEvent(event *EquippedItems) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = EquippedItemsEvent
-	e.EquippedItems = event.EquippedItems
-	e.UnequippedItems = event.UnequippedItems
-	return nil
 }
 
 type EquippedItems struct {
@@ -418,37 +163,9 @@ type EquippedItems struct {
 	UnequippedItems []uint8
 }
 
-func (e *LootEvent) FromDroppedItemsEvent(event *DroppedItems) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = DroppedItemsEvent
-	e.ItemIds = event.ItemIds
-	return nil
-}
-
 type DroppedItems struct {
 	AdventurerStateWithBag
 	ItemIds []uint8
-}
-
-func (e *LootEvent) FromItemLeveledUpEvent(event *ItemLeveledUp) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = ItemLeveledUpEvent
-	e.ItemId = event.ItemId
-	e.PreviousLevel = event.PreviousLevel
-	e.NewLevel = event.NewLevel
-	return nil
 }
 
 type ItemLeveledUp struct {
@@ -458,22 +175,6 @@ type ItemLeveledUp struct {
 	NewLevel      uint8
 }
 
-func (e *LootEvent) FromItemSpecialUnlockedEvent(event *ItemSpecialUnlocked) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = ItemSpecialUnlockedEvent
-	e.Id = event.Id
-	e.Level = uint16(event.Level)
-
-	e.Specials = event.Specials.Pack()
-	return nil
-}
-
 type ItemSpecialUnlocked struct {
 	AdventurerState
 	Id       uint8
@@ -481,37 +182,9 @@ type ItemSpecialUnlocked struct {
 	Specials ItemSpecials
 }
 
-func (e *LootEvent) FromNewHighScoreEvent(event *NewHighScore) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = NewHighScoreEvent
-	e.Rank = event.Rank
-	return nil
-}
-
 type NewHighScore struct {
 	AdventurerState
 	Rank uint8 // 1-3
-}
-
-func (e *LootEvent) FromAdventurerDiedEvent(event *AdventurerDied) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AdventurerDiedEvent
-	e.KilledByBeast = event.KilledByBeast
-	e.KilledByoBstacle = event.KilledByoBstacle
-	e.KillerId = event.KillerId
-	return nil
 }
 
 type AdventurerDied struct {
@@ -521,32 +194,8 @@ type AdventurerDied struct {
 	KillerId         uint8
 }
 
-func (e *LootEvent) FromShopAvailableEvent(event *ShopAvailable) {
-	e.Type = ShopAvailableEvent
-
-	var inventory []uint32
-	for _, l := range event.Inventory {
-		inventory = append(inventory, l.Pack())
-	}
-	e.Inventory = inventory
-}
-
 type ShopAvailable struct {
 	Inventory []*Loot
-}
-
-func (e *LootEvent) FromAdventurerLeveledUpEvent(event *AdventurerLeveledUp) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AdventurerLeveledUpEvent
-	e.PreviousLevel = event.PreviousLevel
-	e.NewLevel = event.NewLevel
-	return nil
 }
 
 type AdventurerLeveledUp struct {
@@ -555,41 +204,9 @@ type AdventurerLeveledUp struct {
 	NewLevel      uint8
 }
 
-func (e *LootEvent) FromNewItemsAvailableEvent(event *NewItemsAvailable) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = NewItemsAvailableEvent
-
-	var items []uint64
-	for _, l := range event.Items {
-		items = append(items, l.Pack())
-	}
-	e.Items = items
-	return nil
-}
-
 type NewItemsAvailable struct {
 	AdventurerState
 	Items []*LootWithPrice
-}
-
-func (e *LootEvent) FromIdleDamagePenaltyEvent(event *IdleDamagePenalty) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = IdleDamagePenaltyEvent
-	e.IdleBlocks = event.IdleBlocks
-	e.DamageTaken = event.DamageTaken
-	return nil
 }
 
 type IdleDamagePenalty struct {
@@ -598,38 +215,8 @@ type IdleDamagePenalty struct {
 	DamageTaken uint16
 }
 
-func (e *LootEvent) FromUpgradeAvailableEvent(event *UpgradeAvailable) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = UpgradeAvailableEvent
-	return nil
-}
-
 type UpgradeAvailable struct {
 	AdventurerState
-}
-
-func (e *LootEvent) FromAdventurerUpgradedEvent(event *AdventurerUpgraded) error {
-	var err error
-	owner, ok := FeltToBigInt(event.AdventurerState.Owner)
-	if !ok {
-		return fmt.Errorf("failed to convert owner to numeric: %w", err)
-	}
-	e.Owner = SqlBigInt(*owner)
-
-	e.Type = AdventurerUpgradedEvent
-	e.StrengthIncrease = event.StrengthIncrease
-	e.DexterityIncrease = event.DexterityIncrease
-	e.VitalityIncrease = event.VitalityIncrease
-	e.IntelligenceIncrease = event.IntelligenceIncrease
-	e.WisdomIncrease = event.WisdomIncrease
-	e.CharismaIncrease = event.CharismaIncrease
-	return nil
 }
 
 type AdventurerUpgraded struct {
