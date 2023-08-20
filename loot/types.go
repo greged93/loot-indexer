@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/NethermindEth/juno/core/felt"
 )
@@ -15,19 +16,47 @@ func FeltToBigInt(f *felt.Felt) (*big.Int, bool) {
 
 type SqlBigInt big.Int
 
-func (b *SqlBigInt) Scan(value interface{}) error {
+func (sqlB *SqlBigInt) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("expected []byte, got %T", value)
 	}
 	result := new(big.Int).SetBytes(bytes)
-	*b = SqlBigInt(*result)
+	*sqlB = SqlBigInt(*result)
 	return nil
 }
 
 func (sqlB SqlBigInt) Value() (driver.Value, error) {
 	b := big.Int(sqlB)
 	return json.Marshal(b.Bytes())
+}
+
+type Packable interface{}
+
+func Pack[T Packable](s T) uint64 {
+	val := reflect.ValueOf(s)
+	var acc uint64 = 0
+	for i := 0; i < val.NumField(); i++ {
+		acc |= val.Field(i).Uint() << uint(8*i)
+	}
+	return acc
+}
+
+func Unpack[T Packable](packed uint64, s *T) error {
+	if s == nil {
+		return fmt.Errorf("cannot unpack into nil Packable")
+	}
+
+	val := reflect.ValueOf(s).Elem()
+	for i := 0; i < val.NumField(); i++ {
+		val.Field(i).SetUint(uint64(0xff & (packed >> uint(8*i))))
+	}
+	v, ok := val.Interface().(T)
+	if !ok {
+		return fmt.Errorf("expected %T, got %T", s, val.Interface())
+	}
+	*s = v
+	return nil
 }
 
 type Adventurer struct {
@@ -64,6 +93,18 @@ type ItemPrimitive struct {
 	Metadata uint8  // 5 bits
 }
 
+func (i *ItemPrimitive) Scan(value interface{}) error {
+	v, ok := value.(uint32)
+	if !ok {
+		return fmt.Errorf("expected uint32, got %T", value)
+	}
+	return Unpack(uint64(v), i)
+}
+
+func (i ItemPrimitive) Value() (driver.Value, error) {
+	return uint32(Pack(i)), nil
+}
+
 type Stats struct {
 	Strength     uint8 // 5 bits
 	Dexterity    uint8 // 5 bits
@@ -71,6 +112,18 @@ type Stats struct {
 	Intelligence uint8 // 5 bits
 	Wisdom       uint8 // 5 bits
 	Charisma     uint8 // 5 bits
+}
+
+func (s *Stats) Scan(value interface{}) error {
+	v, ok := value.(uint64)
+	if !ok {
+		return fmt.Errorf("expected uint64, got %T", value)
+	}
+	return Unpack(v, s)
+}
+
+func (s Stats) Value() (driver.Value, error) {
+	return Pack(s), nil
 }
 
 type AdventurerState struct {
@@ -316,20 +369,34 @@ func (a *AdventurerState) Upgrade(upgrade AdventurerUpgraded) {
 	a.Stats.Charisma += upgrade.CharismaIncrease
 }
 
+type ItemPrimitives [11]ItemPrimitive
+
+func (items *ItemPrimitives) Scan(value interface{}) error {
+	val, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("expected []byte, got %T", value)
+	}
+	return json.Unmarshal(val, items)
+}
+
+func (items ItemPrimitives) Value() (driver.Value, error) {
+	return json.Marshal(items)
+}
+
 type Bag struct {
-	Items   [11]*ItemPrimitive
+	Items   ItemPrimitives
 	Mutated bool
 }
 
 func (b *Bag) addItem(loot Loot) {
-	item := ItemPrimitive{
+	newItem := ItemPrimitive{
 		Id:       loot.Id,
 		Xp:       0,
 		Metadata: 0, // TODO
 	}
-	for i := 0; i < 11; i++ {
-		if b.Items[i] == nil {
-			b.Items[i] = &item
+	for i, item := range b.Items {
+		if item.Id == 0 {
+			b.Items[i] = newItem
 			return
 		}
 	}
