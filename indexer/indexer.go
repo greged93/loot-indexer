@@ -72,7 +72,12 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 
 	err := state.indexerConfig.db.AutoMigrate(&loot.RawEvent{})
 	if err != nil {
-		return fmt.Errorf("error creating loot table: %v", err)
+		return fmt.Errorf("error creating loot raw events table: %v", err)
+	}
+
+	err = state.indexerConfig.db.AutoMigrate(&loot.AdventurerStateWithBag{})
+	if err != nil {
+		return fmt.Errorf("error creating adventurer table: %v", err)
 	}
 
 	var event loot.RawEvent
