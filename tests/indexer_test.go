@@ -16,7 +16,7 @@ func TestIndexer(t *testing.T) {
 	as := actor.NewActorSystem()
 	ctx := actor.NewRootContext(as, nil)
 
-	indexerPid, err := ctx.SpawnNamed(actor.PropsFromProducer(indexer.NewIndexerProducer(*indexerConfig), actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))), "indexer")
+	indexerPid, err := ctx.SpawnNamed(actor.PropsFromProducer(indexer.NewIndexerProducer(indexerConfig), actor.WithSupervisor(actor.NewExponentialBackoffStrategy(100*time.Second, time.Second))), "indexer")
 	if !assert.Nil(t, err, "failed to spawn indexer: %v", err) {
 		t.Fatal()
 	}

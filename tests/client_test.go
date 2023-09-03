@@ -14,21 +14,7 @@ func TestGetEvents(t *testing.T) {
 	if cl == nil {
 		t.Fatalf("nil client")
 	}
-	filter := starkclient.EventsArg{
-		EventFilter: starkclient.EventFilter{
-			FromBlock: &starkclient.BlockID{
-				Pending: false, Latest: false, Hash: nil, Number: 845505,
-			},
-			ToBlock: &starkclient.BlockID{
-				Pending: false, Latest: false, Hash: nil, Number: 845505,
-			},
-			Address: nil,
-			Keys:    make([][]*felt.Felt, 0),
-		},
-		ResultPageRequest: starkclient.ResultPageRequest{
-			ContinuationToken: "", ChunkSize: 32,
-		},
-	}
+	filter := starkclient.NewEventsArg(845505, 845505, nil, make([][]*felt.Felt, 0))
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 

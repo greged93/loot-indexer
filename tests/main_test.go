@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	indexerConfig = indexer.NewIndexerConfig(url, contractAddress, db)
+	indexerConfig = indexer.NewIndexerConfig(url, contractAddress, 10, db)
 
 	os.Exit(m.Run())
 }
