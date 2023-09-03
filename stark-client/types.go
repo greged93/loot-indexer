@@ -18,6 +18,18 @@ type EventFilter struct {
 	Keys      [][]*felt.Felt `json:"keys"`
 }
 
+func NewEventsArg(from uint64, to uint64, address *felt.Felt, keys [][]*felt.Felt) EventsArg {
+	return EventsArg{
+		EventFilter: EventFilter{
+			FromBlock: &BlockID{Number: from},
+			ToBlock:   &BlockID{Number: to},
+			Address:   address,
+			Keys:      keys,
+		},
+		ResultPageRequest: ResultPageRequest{ChunkSize: 500},
+	}
+}
+
 type BlockID struct {
 	Pending bool
 	Latest  bool

@@ -3,7 +3,6 @@ package indexer
 import (
 	"fmt"
 	"loot-indexer/loot"
-	starkclient "loot-indexer/stark-client"
 	"reflect"
 
 	"github.com/NethermindEth/juno/core/felt"
@@ -12,30 +11,35 @@ import (
 	"gorm.io/gorm"
 )
 
+type ErrorTracker struct {
+	err error
+}
+
 type IndexerConfig struct {
 	rpcUrl          string
 	contractAddress *felt.Felt
+	startBlock      uint64
 	lastBlock       uint64
 	db              *gorm.DB
 }
 
-func NewIndexerConfig(rpcUrl string, contractAddress *felt.Felt, db *gorm.DB) *IndexerConfig {
-	return &IndexerConfig{rpcUrl: rpcUrl, contractAddress: contractAddress, db: db}
+func NewIndexerConfig(rpcUrl string, contractAddress *felt.Felt, start uint64, db *gorm.DB) *IndexerConfig {
+	return &IndexerConfig{rpcUrl: rpcUrl, contractAddress: contractAddress, startBlock: start, db: db}
 }
 
 type Indexer struct {
-	indexerConfig IndexerConfig
-	client        *starkclient.Client
+	indexerConfig *IndexerConfig
+	executor      *actor.PID
 	logger        *log.Logger
 }
 
-func NewIndexerProducer(config IndexerConfig) actor.Producer {
+func NewIndexerProducer(config *IndexerConfig) actor.Producer {
 	return func() actor.Actor {
 		return NewIndexer(config)
 	}
 }
 
-func NewIndexer(config IndexerConfig) *Indexer {
+func NewIndexer(config *IndexerConfig) *Indexer {
 	return &Indexer{indexerConfig: config}
 }
 
@@ -59,6 +63,8 @@ func (state *Indexer) Receive(ctx actor.Context) {
 		if err := state.Clean(ctx); err != nil {
 			state.logger.Error("error restarting actor", log.Error((err)))
 		}
+	case *ErrorTracker:
+		state.logger.Error("error in child actor", log.Error(ctx.Message().(*ErrorTracker).err))
 	}
 }
 
@@ -85,14 +91,19 @@ func (state *Indexer) Initialize(ctx actor.Context) error {
 		return fmt.Errorf("error retrieving last event from db: %v", err)
 	}
 	if err == nil {
-		state.indexerConfig.lastBlock = event.BlockNumber
+		if event.BlockNumber > state.indexerConfig.startBlock {
+			state.indexerConfig.lastBlock = event.BlockNumber
+		} else {
+			state.indexerConfig.lastBlock = state.indexerConfig.startBlock
+		}
 	}
 
-	client, err := starkclient.Dial(state.indexerConfig.rpcUrl)
+	props := actor.PropsFromProducer(NewExecutorProducer(state.indexerConfig.rpcUrl, state.indexerConfig.contractAddress, state.indexerConfig.lastBlock))
+	pid, err := ctx.SpawnNamed(props, "executor")
 	if err != nil {
-		return fmt.Errorf("error dialing starknet client at url %s: %v", state.indexerConfig.rpcUrl, err)
+		return fmt.Errorf("error spawning executor: %v", err)
 	}
-	state.client = client
+	state.executor = pid
 
 	return nil
 }
