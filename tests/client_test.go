@@ -40,3 +40,20 @@ func TestGetEvents(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestGetBlock(t *testing.T) {
+	if cl == nil {
+		t.Fatalf("nil client")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	block, err := cl.GetBlock(ctx)
+	if !assert.Nil(t, err, "failed to get block: %v", err) {
+		t.Fatal()
+	}
+	if !assert.NotZero(t, block, "expected non zero block: %v", err) {
+		t.Fatal()
+	}
+}

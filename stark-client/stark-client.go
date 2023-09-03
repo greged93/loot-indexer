@@ -3,6 +3,7 @@ package starkclient
 import (
 	"context"
 
+	"github.com/NethermindEth/juno/core/felt"
 	junoRpc "github.com/NethermindEth/juno/rpc"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -34,4 +35,13 @@ func (client *Client) GetEvents(ctx context.Context, filter *EventsArg) (*junoRp
 		return nil, err
 	}
 	return res, nil
+}
+
+func (client *Client) GetBlock(ctx context.Context) (uint64, error) {
+	res := &felt.Felt{}
+	err := client.Client.CallContext(ctx, res, "starknet_blockNumber")
+	if err != nil {
+		return 0, err
+	}
+	return res.Impl().Uint64(), nil
 }
